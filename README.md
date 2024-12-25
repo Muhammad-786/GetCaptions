@@ -8,7 +8,6 @@ uvicorn app:app --reload --host 0.0.0.0 --port 8000
 2.Open the frontend:
 Place the index.html in the same directory as the app.py.
 Start a simple HTTP server to serve the HTML file:
-bash
 python -m http.server 8080
 
 Open http://localhost:8080 in your browser.
