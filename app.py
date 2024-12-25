@@ -1,82 +1,52 @@
-import streamlit as st
 import whisper
-import tempfile
 import os
-import subprocess
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.responses import FileResponse
+from pathlib import Path
 
-def extract_audio(video_path, audio_path):
-    """Extracts audio from a video file."""
-    command = f"ffmpeg -i \"{video_path}\" -q:a 0 -map a \"{audio_path}\" -y"
-    subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+app = FastAPI()
 
-def transcribe_audio(model_name, audio_path):
-    """Transcribes audio using Whisper."""
-    model = whisper.load_model(model_name)
-    result = model.transcribe(audio_path)
-    return result['text']
+# Create temporary directory for file uploads
+os.makedirs("temp_videos", exist_ok=True)
+os.makedirs("output_files", exist_ok=True)
 
-def save_transcription(text, output_format, output_path):
-    """Saves the transcription in the specified format."""
-    if output_format == "txt":
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(text)
-    elif output_format == "srt":
-        lines = text.split(". ")
-        with open(output_path, "w", encoding="utf-8") as f:
-            for idx, line in enumerate(lines, 1):
-                f.write(f"{idx}\n00:00:00,000 --> 00:00:10,000\n{line.strip()}\n\n")
+@app.post("/transcribe/")
+async def transcribe_video(
+    file: UploadFile,
+    model: str = Form("base"),
+    output_format: str = Form("srt")
+):
+    # Save the uploaded video locally
+    video_path = f"temp_videos/{file.filename}"
+    with open(video_path, "wb") as f:
+        f.write(await file.read())
 
-# Streamlit UI
-st.title("AI Video Transcription")
-st.write("Upload a video file, select a model, and choose your output format.")
+    # Load the Whisper model
+    whisper_model = whisper.load_model(model)
 
-# Video Upload
-uploaded_file = st.file_uploader("Upload Video", type=["mp4", "mov", "mkv", "avi"])
+    # Perform transcription
+    result = whisper_model.transcribe(video_path)
 
-# Model Selection
-model_name = st.selectbox(
-    "Select Whisper Model",
-    ["tiny", "base", "small", "medium", "large"],
-    index=1
-)
+    # Generate output file based on the selected format
+    output_path = f"output_files/{Path(video_path).stem}.{output_format}"
+    with open(output_path, "w") as f:
+        if output_format == "srt":
+            for segment in result["segments"]:
+                f.write(
+                    f"{segment['id'] + 1}\n"
+                    f"{segment['start']:0>2}:{segment['start'] % 60:05.2f} --> {segment['end']:0>2}:{segment['end'] % 60:05.2f}\n"
+                    f"{segment['text']}\n\n"
+                )
+        elif output_format == "txt":
+            f.write(result["text"])
+        elif output_format == "vtt":
+            f.write("WEBVTT\n\n")
+            for segment in result["segments"]:
+                f.write(
+                    f"{segment['start']:0>2}:{segment['start'] % 60:05.2f} --> {segment['end']:0>2}:{segment['end'] % 60:05.2f}\n"
+                    f"{segment['text']}\n\n"
+                )
+        else:
+            raise ValueError("Unsupported format.")
 
-# Output Format Selection
-output_format = st.selectbox(
-    "Select Output Format",
-    ["txt", "srt"],
-    index=0
-)
-
-if uploaded_file:
-    # Save uploaded file to a temporary location
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_video:
-        tmp_video.write(uploaded_file.read())
-        video_path = tmp_video.name
-
-    # Extract audio to a temporary file
-    audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
-    st.write("Extracting audio...")
-    extract_audio(video_path, audio_path)
-
-    # Transcribe audio
-    st.write("Transcribing audio with Whisper...")
-    transcription = transcribe_audio(model_name, audio_path)
-
-    # Save transcription
-    output_path = tempfile.NamedTemporaryFile(delete=False, suffix=f".{output_format}").name
-    save_transcription(transcription, output_format, output_path)
-
-    # Provide download link
-    st.write("Transcription complete!")
-    with open(output_path, "rb") as f:
-        st.download_button(
-            label=f"Download Transcription ({output_format.upper()})",
-            data=f,
-            file_name=f"transcription.{output_format}",
-            mime=f"text/{output_format}"
-        )
-
-    # Clean up temporary files
-    os.remove(video_path)
-    os.remove(audio_path)
-    os.remove(output_path)
+    return FileResponse(output_path, media_type="application/octet-stream", filename=Path(output_path).name)
