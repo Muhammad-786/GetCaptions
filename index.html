@@ -4,13 +4,89 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Video Transcription</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    form {
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      width: 400px;
+      text-align: center;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      background-color: #333;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+
+    select {
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      background-color: #333;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #result {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    a {
+      color: #00d1b2;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
 <body>
-  <h1>AI Video Transcription</h1>
   <form id="transcriptionForm">
-    <label for="video">Upload Video:</label>
+    <h1>AI Video Transcription</h1>
+
+    <label for="videoFile">Upload Video:</label>
     <input type="file" id="videoFile" name="file" accept="video/*" required />
-    <br /><br />
 
     <label for="model">Select Whisper Model:</label>
     <select id="model" name="model">
@@ -20,7 +96,6 @@
       <option value="medium">Medium</option>
       <option value="large">Large</option>
     </select>
-    <br /><br />
 
     <label for="format">Select Output Format:</label>
     <select id="format" name="output_format">
@@ -28,38 +103,39 @@
       <option value="txt">TXT</option>
       <option value="vtt">VTT</option>
     </select>
-    <br /><br />
 
     <button type="submit">Transcribe</button>
   </form>
 
-  <div id="result" style="margin-top: 20px;"></div>
+  <div id="result"></div>
 
   <script>
     document.getElementById("transcriptionForm").onsubmit = async function (e) {
       e.preventDefault();
       const formData = new FormData(this);
 
-      // Send request to the backend
       const response = await fetch("/transcribe/", {
         method: "POST",
         body: formData,
       });
 
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = ""; // Clear previous results
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
 
-        // Create a download link for the file
         const downloadLink = document.createElement("a");
         downloadLink.href = url;
-        downloadLink.download = response.headers.get("content-disposition").split("filename=")[1];
+        downloadLink.download = response.headers
+          .get("content-disposition")
+          .split("filename=")[1];
         downloadLink.innerHTML = "Click here to download your file";
-        document.getElementById("result").innerHTML = "";
-        document.getElementById("result").appendChild(downloadLink);
+        resultDiv.appendChild(downloadLink);
       } else {
         const error = await response.json();
-        document.getElementById("result").innerHTML = `Error: ${error.message}`;
+        resultDiv.innerHTML = `Error: ${error.message}`;
       }
     };
   </script>
