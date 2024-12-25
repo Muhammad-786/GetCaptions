@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Video Transcription</title>
+</head>
+<body>
+  <h1>AI Video Transcription</h1>
+  <form id="transcriptionForm">
+    <label for="video">Upload Video:</label>
+    <input type="file" id="videoFile" name="file" accept="video/*" required />
+    <br /><br />
+
+    <label for="model">Select Whisper Model:</label>
+    <select id="model" name="model">
+      <option value="tiny">Tiny</option>
+      <option value="base">Base</option>
+      <option value="small">Small</option>
+      <option value="medium">Medium</option>
+      <option value="large">Large</option>
+    </select>
+    <br /><br />
+
+    <label for="format">Select Output Format:</label>
+    <select id="format" name="output_format">
+      <option value="srt">SRT</option>
+      <option value="txt">TXT</option>
+      <option value="vtt">VTT</option>
+    </select>
+    <br /><br />
+
+    <button type="submit">Transcribe</button>
+  </form>
+
+  <div id="result" style="margin-top: 20px;"></div>
+
+  <script>
+    document.getElementById("transcriptionForm").onsubmit = async function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+
+      // Send request to the backend
+      const response = await fetch("/transcribe/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // Create a download link for the file
+        const downloadLink = document.createElement("a");
+        downloadLink.href = url;
+        downloadLink.download = response.headers.get("content-disposition").split("filename=")[1];
+        downloadLink.innerHTML = "Click here to download your file";
+        document.getElementById("result").innerHTML = "";
+        document.getElementById("result").appendChild(downloadLink);
+      } else {
+        const error = await response.json();
+        document.getElementById("result").innerHTML = `Error: ${error.message}`;
+      }
+    };
+  </script>
+</body>
+</html>
