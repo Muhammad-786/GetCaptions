@@ -2,8 +2,8 @@
 
 1,Running the Application
 Run the backend server:
-bash
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
+
 
 2.Open the frontend:
 Place the index.html in the same directory as the app.py.
